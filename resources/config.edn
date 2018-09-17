@@ -1,0 +1,9 @@
+{:kinesis-client
+ {:name "stm-bbe"
+  :version "0.1.0"
+  :region "eu-west-1"
+  :credentials-profile "stm-bbe"}
+ :webserver
+ {:port 8080
+  :input-stream "msg-input"
+  :output-stream "msg-output"}}
