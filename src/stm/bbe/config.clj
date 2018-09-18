@@ -1,11 +1,11 @@
-(ns stm.bbe.config
+(ns sabe.config
   (:require [aero.core :as aero]
             [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
-            [stm.bbe.crypt :as crypt]
-            [stm.bbe.util :as util])
+            [sabe.crypt :as crypt]
+            [sabe.util :as util])
   (:import [java.io StringWriter]))
 
 (defmethod aero/reader 'region

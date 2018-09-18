@@ -10,10 +10,11 @@
             [com.stuartsierra.component :as component]
             [manifold.stream :as s]
             [reloaded.repl :refer [start stop go system init reset]]
-            [stm.bbe.config :as config]
-            [stm.bbe.kinesis.client :as kinesis]
-            [stm.bbe.logging :as logging]
-            [stm.bbe.system :as system])
+            [sabe.config :as config]
+            [sabe.kinesis.client :as kinesis]
+            [sabe.logging :as logging]
+            [sabe.system :as system]
+            [sabe.util :as util])
   (:import [ch.qos.logback.classic Logger]
            [org.slf4j LoggerFactory]
            [com.amazonaws.services.kinesis.model
@@ -82,17 +83,19 @@
        (sort-by :name)
        (pprint/print-table)))
 
-(defn ping-msg [client-id time]
+(defn ping-msg [client-id]
   {:message/id (java.util.UUID/randomUUID)
    :message/type :system/echo-request
-   :message/data {:time time}
+   :message/data {:sent-time (System/currentTimeMillis)}
    :client/id client-id})
 
 (comment
-  (def conn @(http/websocket-client "ws://localhost:8080/msg/456"))
-  conn
-  @(s/put! conn "blahblahblah oh yeah!")
-  @(s/take! conn )
-  @(s/put-all! conn (map #(str "test data " %) (range 10)))
-  (s/close! conn)
-  )
+  (let [ws-base-url "ws://localhost:8080/message/"
+        client-id (java.util.UUID/randomUUID)
+        conn @(http/websocket-client (str ws-base-url client-id))
+        msg (ping-msg client-id)]
+    @(s/put! conn (util/clj->msgpack msg))
+    (-> @(s/take! conn)
+        (util/msgpack->clj)
+        (println))
+    (s/close! conn)))

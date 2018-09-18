@@ -1,4 +1,4 @@
-(ns stm.bbe.logging
+(ns sabe.logging
   (:require [clojure.tools.logging :as log])
   (:import [org.slf4j MDC]))
 

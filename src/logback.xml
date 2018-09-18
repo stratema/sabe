@@ -12,7 +12,7 @@
         <appender-ref ref="STDOUT" />
     </root>
 
-    <logger name="stm.bbe" additivity="false" level="DEBUG">
+    <logger name="sabe" additivity="false" level="DEBUG">
         <appender-ref ref="STDOUT"/>
     </logger>
 

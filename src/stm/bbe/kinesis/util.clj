@@ -1,4 +1,4 @@
-(ns stm.bbe.kinesis.util
+(ns sabe.kinesis.util
   (:require [clojure.string :as string])
   (:import [com.amazonaws ClientConfiguration]))
 

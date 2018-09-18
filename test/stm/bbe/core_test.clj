@@ -1,6 +1,6 @@
-(ns stm.bbe.core-test
+(ns sabe.core-test
   (:require [clojure.test :refer :all]
-            [stm.bbe.core :refer :all]))
+            [sabe.core :refer :all]))
 
 (deftest a-test
   (testing "FIXME, I fail."

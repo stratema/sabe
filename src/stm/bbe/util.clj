@@ -1,6 +1,10 @@
-(ns stm.bbe.util
+(ns sabe.util
   (:require [clojure.java.io :as io]
-            [clojure.string :as string]))
+            [clojure.string :as string]
+            [cognitect.transit :as transit])
+  (:import [java.io
+            ByteArrayInputStream
+            ByteArrayOutputStream]))
 
 (defn to-keyword
   [s]
@@ -40,3 +44,16 @@
 (defn render
   [tpl vals]
   (string/replace tpl #"\{([-\w]+)\}" (comp str vals keyword second)))
+
+(defn clj->msgpack [m]
+  (let [out (ByteArrayOutputStream. 1024)
+        writer (transit/writer out :msgpack)]
+    (transit/write writer m)
+    (.toByteArray out)))
+
+(defn msgpack->clj [bytes]
+  (-> (ByteArrayInputStream. bytes)
+      (transit/reader :msgpack)
+      (transit/read)))
+
+;; (= m (-> m clj->msgpack msgpack->clj))

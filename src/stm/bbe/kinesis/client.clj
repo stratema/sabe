@@ -1,9 +1,9 @@
-(ns stm.bbe.kinesis.client
+(ns sabe.kinesis.client
   (:require [clojure.tools.logging :as log]
             [clojure.string :as string]
             [com.stuartsierra.component :as component]
-            [stm.bbe.logging :as logging]
-            [stm.bbe.kinesis.util :as util])
+            [sabe.logging :as logging]
+            [sabe.kinesis.util :as util])
   (:import [java.nio ByteBuffer]
            [com.amazonaws AmazonClientException]
            [com.amazonaws.auth AWSCredentialsProvider]

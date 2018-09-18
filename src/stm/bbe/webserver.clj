@@ -1,4 +1,4 @@
-(ns stm.bbe.webserver
+(ns sabe.webserver
   (:require
    [clojure.tools.logging :as log]
    [com.stuartsierra.component :as component]
@@ -9,7 +9,7 @@
    [manifold.bus :as b]
    [manifold.stream :as s]
    [manifold.deferred :as d]
-   [stm.bbe.kinesis.client :as kinesis]))
+   [sabe.kinesis.client :as kinesis]))
 
 (def non-websocket-request
   {:status 400
@@ -27,21 +27,20 @@
 
 (defn msg-handler
   [req
-   {:keys [kinesis-client input-stream webserver-output-consumer]}]
+   {:keys [kinesis-client input-stream webserver-output-consumer
+           client-write-timeout]}]
   (let [client-id (-> req :params :client-id)
         bus (:bus webserver-output-consumer)]
     (->
      (d/let-flow [socket (http/websocket-connection req)]
        (s/consume
-        #(kinesis/put (:client kinesis-client) input-stream client-id
-                      ;; Assume the data is a string for now
-                      (.getBytes % "UTF-8"))
+        #(kinesis/put (:client kinesis-client) input-stream client-id %)
         (s/throttle 10 socket))
 
        (s/connect
         (b/subscribe bus client-id)
         socket
-        {:timeout 1e4}))
+        {:timeout client-write-timeout}))
      (d/catch
          (fn [_] non-websocket-request))))
   ;; Compojure doesn't like a boolean return value, so return nil
@@ -52,22 +51,20 @@
   (params/wrap-params
    (compojure/routes
     (GET "/echo" [] echo-handler)
-    (GET "/msg/:client-id" [client-id]
+    (GET "/message/:client-id" [client-id]
          #(msg-handler % config))
     (route/not-found "No such page."))))
 
-;; we need
-;; a worker that is listening to messages on bbe-output
-;; need to create a subscription to that worker's ouptput channel that
-;; filters out messages with matching client-id
 (defrecord WebServer
-    [server port kinesis-client input-stream webserver-output-consumer]
+    [server port kinesis-client input-stream webserver-output-consumer
+     client-write-timeout]
   component/Lifecycle
   (start [this]
     (assoc this :server
            (http/start-server
             (server-handler {:kinesis-client kinesis-client
                              :input-stream input-stream
+                             :client-write-timeout client-write-timeout
                              :webserver-output-consumer webserver-output-consumer})
             {:port port})))
 

@@ -1,4 +1,4 @@
-(ns stm.bbe.core
+(ns sabe.core
   (:gen-class))
 
 (defn -main

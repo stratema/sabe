@@ -1,4 +1,4 @@
-(ns stm.bbe.crypt
+(ns sabe.crypt
   (:require [clojure.data.codec.base64 :as base64])
   (:import java.nio.charset.Charset
            java.security.SecureRandom

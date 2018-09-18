@@ -1,9 +1,9 @@
-(ns stm.bbe.kinesis.worker
+(ns sabe.kinesis.worker
   (:require [clojure.tools.logging :as log]
             [clojure.string :as string]
             [com.stuartsierra.component :as component]
-            [stm.bbe.logging :as logging]
-            [stm.bbe.kinesis.util :as util])
+            [sabe.logging :as logging]
+            [sabe.kinesis.util :as util])
   (:import [com.amazonaws.auth.profile ProfileCredentialsProvider]
            [com.amazonaws.services.kinesis.clientlibrary.interfaces.v2
             IRecordProcessor

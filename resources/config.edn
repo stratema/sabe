@@ -3,20 +3,21 @@
   :version "0.1.0"
   :region "eu-west-1"
   :credentials-profile "stm-bbe"}
- :echo-consumer
- {:name "echo-consumer"
+ :system-consumer
+ {:name "system-consumer"
   :input-stream "msg-input"
   :output-stream "msg-output"}
- :input-logging-consumer
- {:name "input-logging-consumer"
-  :stream "msg-input"}
- :output-logging-consumer
- {:name "output-logging-consumer"
-  :stream "msg-output"}
+ ;; :input-logging-consumer
+ ;; {:name "input-logging-consumer"
+ ;;  :stream "msg-input"}
+ ;; :output-logging-consumer
+ ;; {:name "output-logging-consumer"
+ ;;  :stream "msg-output"}
  :webserver-output-consumer
  {:name "webserver-output-consumer"
   :stream "msg-output"}
  :webserver
  {:port 8080
+  :client-write-timeout 10000
   :input-stream "msg-input"
   :output-stream "msg-output"}}
