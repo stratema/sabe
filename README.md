@@ -6,10 +6,6 @@ Bobby Calderwood's Commander pattern.
 
 Alpha quality, purely for experimentation at this stage.
 
-## Installation
-
-Download from http://example.com/FIXME.
-
 ## License
 
 Copyright © 2018 Stratema Ltd.
