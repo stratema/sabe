@@ -49,7 +49,6 @@
 
   (some->> profile name string/upper-case (System/setProperty "PROFILE"))
   (some->> region name string/upper-case (System/setProperty "REGION"))
-  (System/setProperty "RESTORE_LAST_BACKUP" (str restore-last-backup))
 
   (let [options {:config-key config-key :decrypt true
                  :profile profile :region region}
