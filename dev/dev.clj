@@ -6,11 +6,12 @@
             [clojure.pprint :as pprint]
             [clojure.test :as test]
             [clojure.tools.namespace.repl :refer [refresh]]
+            [cognitect.transit :as transit]
             [com.stuartsierra.component :as component]
             [manifold.stream :as s]
             [reloaded.repl :refer [start stop go system init reset]]
             [stm.bbe.config :as config]
-            [stm.bbe.kinesis :as kinesis]
+            [stm.bbe.kinesis.client :as kinesis]
             [stm.bbe.logging :as logging]
             [stm.bbe.system :as system])
   (:import [ch.qos.logback.classic Logger]
@@ -81,33 +82,17 @@
        (sort-by :name)
        (pprint/print-table)))
 
-(def app-opts {:name "stm-bbe"
-               :version "0.1.0"
-               :region "eu-west-1"
-               :failover-time 30000
-               :credentials-profile "stm-bbe"})
-(def stream "msg-input")
+(defn ping-msg [client-id time]
+  {:message/id (java.util.UUID/randomUUID)
+   :message/type :system/echo-request
+   :message/data {:time time}
+   :client/id client-id})
 
-(defn logging-worker
-  "A worker that just logs everything"
-  [stream opts]
-  (kinesis/worker
-   stream
-   (fn [^ProcessRecordsInput input]
-     (let [records (.getRecords input)]
-       (log/debugf "Received %d records" (count records))
-       (run! (fn [^Record record]
-               (log/debugf "Received %s %s"
-                           (.getPartitionKey record)
-                           (String. (.array (.getData record)))))
-             records)))
-   (assoc opts
-          :init-fn (fn [^InitializationInput input]
-                     (log/debug "I've started!"))
-          :shutdown-fn (fn [^ShutdownInput input]
-                         (log/debug "I've stopped!")))))
-
-#_(let [;; lw (logging-worker stream app-opts)
-      conn @(http/websocket-client "ws://localhost:8080/msg/123")]
-  ;; (kinesis/start! lw)
-  (s/put-all! conn (map #(str "test data " %) (range 100))))
+(comment
+  (def conn @(http/websocket-client "ws://localhost:8080/msg/456"))
+  conn
+  @(s/put! conn "blahblahblah oh yeah!")
+  @(s/take! conn )
+  @(s/put-all! conn (map #(str "test data " %) (range 10)))
+  (s/close! conn)
+  )

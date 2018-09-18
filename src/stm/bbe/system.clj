@@ -2,17 +2,25 @@
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as component]
             [stm.bbe.config :as config]
-            [stm.bbe.kinesis :as kinesis]
+            [stm.bbe.kinesis.client :as client]
+            [stm.bbe.kinesis.consumers :as consumers]
             [stm.bbe.logging :as logging]
             [stm.bbe.webserver :as webserver]))
 
-
 (defn prod-system []
   {:components
-   {:kinesis-client (kinesis/map->KinesisClient {})
-    :webserver (webserver/map->WebServer {})}
+   {:kinesis-client (client/map->KinesisClient {})
+    :echo-consumer (consumers/map->EchoConsumer {})
+    :input-logging-consumer (consumers/map->LoggingConsumer {})
+    :output-logging-consumer (consumers/map->LoggingConsumer {})
+    :webserver (webserver/map->WebServer {})
+    :webserver-output-consumer (consumers/map->WebServerOutputConsumer {})}
    :dependencies
-   {:webserver [:kinesis-client]}})
+   {:webserver [:kinesis-client :webserver-output-consumer]
+    :webserver-output-consumer [:kinesis-client]
+    :echo-consumer [:kinesis-client]
+    :input-logging-consumer [:kinesis-client]
+    :output-logging-consumer [:kinesis-client]}})
 
 (defn new-system
   [{:keys [components dependencies]} config]

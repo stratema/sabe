@@ -1,15 +1,15 @@
 (ns stm.bbe.webserver
   (:require
-   [clojure.core.async :as a]
    [clojure.tools.logging :as log]
    [com.stuartsierra.component :as component]
    [compojure.core :as compojure :refer [GET]]
    [compojure.route :as route]
    [ring.middleware.params :as params]
    [aleph.http :as http]
+   [manifold.bus :as b]
    [manifold.stream :as s]
    [manifold.deferred :as d]
-   [stm.bbe.kinesis :as kinesis]))
+   [stm.bbe.kinesis.client :as kinesis]))
 
 (def non-websocket-request
   {:status 400
@@ -22,21 +22,30 @@
    (d/let-flow [socket (http/websocket-connection req)]
      (s/connect socket socket))
    (d/catch
-       (fn [_] non-websocket-request))))
+       (fn [_] non-websocket-request)))
+  nil)
 
 (defn msg-handler
   [req
-   {:keys [kinesis-client input-stream]}]
-  (let [client-id (-> req :params :client-id)]
+   {:keys [kinesis-client input-stream webserver-output-consumer]}]
+  (let [client-id (-> req :params :client-id)
+        bus (:bus webserver-output-consumer)]
     (->
      (d/let-flow [socket (http/websocket-connection req)]
        (s/consume
         #(kinesis/put (:client kinesis-client) input-stream client-id
                       ;; Assume the data is a string for now
                       (.getBytes % "UTF-8"))
-        socket))
+        (s/throttle 10 socket))
+
+       (s/connect
+        (b/subscribe bus client-id)
+        socket
+        {:timeout 1e4}))
      (d/catch
-         (fn [_] non-websocket-request)))))
+         (fn [_] non-websocket-request))))
+  ;; Compojure doesn't like a boolean return value, so return nil
+  nil)
 
 (defn server-handler
   [config]
@@ -52,14 +61,14 @@
 ;; need to create a subscription to that worker's ouptput channel that
 ;; filters out messages with matching client-id
 (defrecord WebServer
-    [server port kinesis-client input-stream output-stream]
+    [server port kinesis-client input-stream webserver-output-consumer]
   component/Lifecycle
   (start [this]
     (assoc this :server
            (http/start-server
             (server-handler {:kinesis-client kinesis-client
                              :input-stream input-stream
-                             :output-stream output-stream})
+                             :webserver-output-consumer webserver-output-consumer})
             {:port port})))
 
   (stop [{:keys [server] :as this}]
