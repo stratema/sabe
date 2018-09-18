@@ -1,8 +1,8 @@
 {:kinesis-client
- {:name "stm-bbe"
+ {:name "sabe"
   :version "0.1.0"
   :region "eu-west-1"
-  :credentials-profile "stm-bbe"}
+  :credentials-profile "sabe"}
  :system-consumer
  {:name "system-consumer"
   :input-stream "msg-input"
