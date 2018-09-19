@@ -27,22 +27,31 @@
 
 (defn msg-handler
   [req
-   {:keys [kinesis-client input-stream webserver-output-consumer
-           client-write-timeout]}]
+   {:keys [kinesis-client input-stream bus client-write-timeout]}]
   (let [client-id (-> req :params :client-id)
-        bus (:bus webserver-output-consumer)]
+        bus-subscription (b/subscribe bus client-id)]
+    (log/tracef "Subscribed to bus with client-id '%s'" client-id)
     (->
      (d/let-flow [socket (http/websocket-connection req)]
-       (s/consume
-        #(kinesis/put (:client kinesis-client) input-stream client-id %)
-        (s/throttle 10 socket))
+       (s/on-closed socket (fn []
+                             (log/tracef "Unsubscribing from bus for client-id '%s'"
+                                         client-id)
+                             (s/close! bus-subscription)))
 
-       (s/connect
-        (b/subscribe bus client-id)
-        socket
-        {:timeout client-write-timeout}))
+       ;; websocket -> msg-input
+       (s/consume (fn [msg]
+                    (log/tracef "Received msg, %d bytes, putting on '%s'"
+                                (count msg) input-stream)
+                    (kinesis/put kinesis-client input-stream client-id msg))
+                  socket)
+
+       ;; msg-output -> websocket
+       (s/connect bus-subscription socket
+                  {:timeout client-write-timeout
+                   :upstream? true}))
      (d/catch
          (fn [_] non-websocket-request))))
+
   ;; Compojure doesn't like a boolean return value, so return nil
   nil)
 
@@ -56,16 +65,17 @@
     (route/not-found "No such page."))))
 
 (defrecord WebServer
-    [server port kinesis-client input-stream webserver-output-consumer
+    [server port kinesis-client input-stream webserver-output-app
      client-write-timeout]
   component/Lifecycle
   (start [this]
+    (log/info "Starting WebServer")
     (assoc this :server
            (http/start-server
-            (server-handler {:kinesis-client kinesis-client
+            (server-handler {:kinesis-client (:client kinesis-client)
                              :input-stream input-stream
                              :client-write-timeout client-write-timeout
-                             :webserver-output-consumer webserver-output-consumer})
+                             :bus (:bus webserver-output-app)})
             {:port port})))
 
   (stop [{:keys [server] :as this}]

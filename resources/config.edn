@@ -3,19 +3,32 @@
   :version "0.1.0"
   :region "eu-west-1"
   :credentials-profile "sabe"}
- :system-consumer
- {:name "system-consumer"
+
+ :system-app
+ {:name "system-app"
+  :version "0.1.0"                      ; These are the defaults but are shown
+  :region "eu-west-1"                   ; here to illustrate that they can be
+  :credentials-profile "sabe"           ; overridden per app
   :input-stream "msg-input"
   :output-stream "msg-output"}
- ;; :input-logging-consumer
- ;; {:name "input-logging-consumer"
+
+ :direct-debit-app
+ {:name "direct-debit-app"
+  :input-stream "msg-input"
+  :output-stream "msg-output"}
+
+ ;; :input-logging-app
+ ;; {:name "input-logging-app"
  ;;  :stream "msg-input"}
- ;; :output-logging-consumer
- ;; {:name "output-logging-consumer"
+
+ ;; :output-logging-app
+ ;; {:name "output-logging-app"
  ;;  :stream "msg-output"}
- :webserver-output-consumer
- {:name "webserver-output-consumer"
+
+ :webserver-output-app
+ {:name "webserver-output-app"
   :stream "msg-output"}
+
  :webserver
  {:port 8080
   :client-write-timeout 10000

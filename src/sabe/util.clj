@@ -4,7 +4,12 @@
             [cognitect.transit :as transit])
   (:import [java.io
             ByteArrayInputStream
-            ByteArrayOutputStream]))
+            ByteArrayOutputStream]
+           [com.cognitect.transit
+            TransitFactory
+            TransitFactory$Format
+            Reader
+            Writer]))
 
 (defn to-keyword
   [s]
@@ -55,5 +60,10 @@
   (-> (ByteArrayInputStream. bytes)
       (transit/reader :msgpack)
       (transit/read)))
+
+(defn msgpack->java [bytes]
+  (let [in (ByteArrayInputStream. bytes)
+        reader (TransitFactory/reader TransitFactory$Format/MSGPACK in)]
+    (.read reader)))
 
 ;; (= m (-> m clj->msgpack msgpack->clj))

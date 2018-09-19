@@ -1,32 +1,23 @@
 (ns dev
-  (:require [aleph.http :as http]
-            [clojure.tools.logging :as log]
+  (:require [clojure.tools.logging :as log]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [clojure.test :as test]
             [clojure.tools.namespace.repl :refer [refresh]]
-            [cognitect.transit :as transit]
             [com.stuartsierra.component :as component]
-            [manifold.stream :as s]
             [reloaded.repl :refer [start stop go system init reset]]
             [sabe.config :as config]
-            [sabe.kinesis.client :as kinesis]
             [sabe.logging :as logging]
             [sabe.system :as system]
+
+            [aleph.http :as http]
+            [manifold.stream :as s]
             [sabe.util :as util])
   (:import [ch.qos.logback.classic Logger]
-           [org.slf4j LoggerFactory]
-           [com.amazonaws.services.kinesis.model
-            Record]
-           [com.amazonaws.services.kinesis.clientlibrary.types
-            InitializationInput
-            ProcessRecordsInput
-            ShutdownInput]))
+           [org.slf4j LoggerFactory]))
 
-
-(defn dev-system
-  []
+(defn dev-system []
   (system/prod-system))
 
 (defn load-dev-config []
@@ -74,7 +65,7 @@
           (.setLevel logger)))))
 
 (comment
-  (set-logging-level! 'stm :debug)
+  (set-logging-level! 'sabe :debug)
   (set-logging-level! 'dev :debug))
 
 (defn members
@@ -83,19 +74,71 @@
        (sort-by :name)
        (pprint/print-table)))
 
+
+;; Demo ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn ping-msg [client-id]
   {:message/id (java.util.UUID/randomUUID)
    :message/type :system/echo-request
    :message/data {:sent-time (System/currentTimeMillis)}
    :client/id client-id})
 
+(defn create-mandate-msg [client-id]
+  {:message/id (java.util.UUID/randomUUID)
+   :message/type :direct-debit/create-mandate
+   :message/data {:email "joe@bloggs.com"
+                  :first-name "joe"
+                  :last-name "bloggs"
+                  :address {:line1 "123 street"
+                            :line2 ""
+                            :city "London"
+                            :postcode "AB12 3CD"
+                            :country-code :gb}
+                  :sort-code "01-23-45"
+                  :account-number "12345678"
+                  :amount "£9.99"
+                  :schedule {:on 5 :each :month}}
+   :client/id client-id})
+
 (comment
+  ;; Silence noise from KCL
+  (set-logging-level! 'com.amazonaws.services.kinesis.clientlibrary :error)
+
   (let [ws-base-url "ws://localhost:8080/message/"
         client-id (java.util.UUID/randomUUID)
         conn @(http/websocket-client (str ws-base-url client-id))
         msg (ping-msg client-id)]
-    @(s/put! conn (util/clj->msgpack msg))
-    (-> @(s/take! conn)
-        (util/msgpack->clj)
-        (println))
+
+    (let [r (time (do
+                    @(s/put! conn (util/clj->msgpack msg))
+                    @(s/try-take! conn ::drained 10000 ::timeout)))]
+      (println (if (bytes? r)
+                 (util/msgpack->clj r)
+                 r)))
     (s/close! conn)))
+
+(comment
+  (def ws-base-url "ws://localhost:8080/message/")
+  (def client-id (java.util.UUID/randomUUID))
+  (def conn @(http/websocket-client (str ws-base-url client-id)))
+  (def msg (ping-msg client-id))
+
+  @(s/put! conn (util/clj->msgpack msg))
+  (def reply @(s/take! conn))
+  (println (util/msgpack->clj reply))
+
+  (s/close! conn)
+  )
+
+(comment
+  (def ws-base-url "ws://localhost:8080/echo")
+  (def client-id (java.util.UUID/randomUUID))
+  (def conn @(http/websocket-client ws-base-url))
+  (def msg (ping-msg client-id))
+
+  @(s/put! conn (util/clj->msgpack msg))
+  (def reply @(s/take! conn))
+  (println (util/msgpack->clj reply))
+
+  (s/close! conn)
+  )

@@ -2,26 +2,27 @@
   (:require [clojure.tools.logging :as log]
             [com.stuartsierra.component :as component]
             [sabe.config :as config]
-            [sabe.kinesis.client :as client]
-            [sabe.kinesis.consumers :as consumers]
+            [sabe.kinesis.client :as kinesis]
+            [sabe.apps.direct-debit :as apps-direct-debit]
+            [sabe.apps.logging :as apps-logging]
+            [sabe.apps.system :as apps-system]
+            [sabe.apps.webserver-output :as apps-webserver-output]
             [sabe.logging :as logging]
             [sabe.webserver :as webserver]))
 
 (defn prod-system []
   {:components
-   {:kinesis-client (client/map->KinesisClient {})
-    :system-consumer (consumers/map->SystemConsumer {})
-    ;; :input-logging-consumer (consumers/map->LoggingConsumer {})
-    ;; :output-logging-consumer (consumers/map->LoggingConsumer {})
+   {:kinesis-client (kinesis/map->KinesisClient {})
+    ;; :input-logging-app (apps/map->LoggingApp {})
+    ;; :output-logging-app (apps/map->LoggingApp {})
+    :direct-debit-app (apps-direct-debit/map->DirectDebitApp {})
+    :system-app (apps-system/map->SystemApp {})
     :webserver (webserver/map->WebServer {})
-    :webserver-output-consumer (consumers/map->WebServerOutputConsumer {})}
+    :webserver-output-app (apps-webserver-output/map->WebServerOutputApp {})}
    :dependencies
-   {:webserver [:kinesis-client :webserver-output-consumer]
-    :webserver-output-consumer [:kinesis-client]
-    ;; :input-logging-consumer [:kinesis-client]
-    ;; :output-logging-consumer [:kinesis-client]
-    :system-consumer [:kinesis-client]
-    }})
+   {:direct-debit-app [:kinesis-client]
+    :system-app [:kinesis-client]
+    :webserver [:kinesis-client :webserver-output-app]}})
 
 (defn new-system
   [{:keys [components dependencies]} config]
@@ -31,7 +32,7 @@
 
 (defn start-system
   [system options]
-  (logging/install-uncaught-exception-handler)
+  ;; (logging/install-uncaught-exception-handler)
   (log/info "Starting system with options:" (dissoc options :config-key))
   (let [config (config/config options)]
     (if (contains? options :dry-run)
