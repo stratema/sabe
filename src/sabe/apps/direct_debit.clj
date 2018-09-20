@@ -11,29 +11,28 @@
            [com.amazonaws.services.kinesis.clientlibrary.types
             ProcessRecordsInput]))
 
-;; Dummy DB to record created mandates
-(def mandate-db (atom {}))
-
 ;; Country/Region specific DDI fulfillment functions
 ;; UK
 
 ;; In reality these would talk to the real backend service/api from
 ;; the payment service provider in that country. For our demo we will
 ;; implement a temporary local database of mandates
-(defn auddis-create-ddi [message-data]
+(defn auddis-create-ddi [db message-data]
   (let [mandate-id (java.util.UUID/randomUUID)
         mandate #:mandate{:id mandate-id :details message-data}]
-    (swap! mandate-db assoc mandate-id mandate)
+    (log/tracef "Creating new mandate with id %s" mandate-id)
+    (swap! db assoc mandate-id mandate)
     mandate))
 
 (defn auddis-cancel-ddi
-  [{:mandate/keys [id] :as message-data}]
-  (swap! mandate-db dissoc id)
+  [db {:mandate/keys [id] :as message-data}]
+  (log/tracef "Removing mandate with id %s" id)
+  (swap! db dissoc id)
   nil)
 
 ;; Sweden
-(defn autogirot-create-mandate [])
-(defn autogirot-cancel-mandate [])
+(defn autogirot-create-mandate [db message-data])
+(defn autogirot-cancel-mandate [db message-data])
 
 (def provider-fns
   {:gb {:create-mandate auddis-create-ddi
@@ -41,23 +40,25 @@
    :se {:create-mandate autogirot-create-mandate
         :cancel-mandate autogirot-cancel-mandate}})
 
-(defn create-mandate [{:message/keys [id data] :as message}]
+(defn create-mandate [db {:message/keys [id data] :as message}]
+  (log/tracef "Calling create-mandate with message %s" message)
   (let [country-code (-> data :address :country-code)
         handler (-> provider-fns country-code :create-mandate)]
+    (log/tracef "Calling create-mandate for %s provider" country-code)
     (assoc message
            :message/id (java.util.UUID/randomUUID)
            :message/type :direct-debit/mandate-created
            :message/parent-id id
-           :message/data (handler data))))
+           :message/data (handler db data))))
 
-(defn cancel-mandate [{:message/keys [id data] :as message}]
+(defn cancel-mandate [db {:message/keys [id data] :as message}]
   (let [country-code (-> data :country-code)
-        handler (-> provider-fns country-code :create-mandate)]
+        handler (-> provider-fns country-code :cancel-mandate)]
     (assoc message
            :message/id (java.util.UUID/randomUUID)
            :message/type :direct-debit/mandate-cancelled
            :message/parent-id id
-           :message/data (handler data))))
+           :message/data (handler db data))))
 
 (def message-handlers
   {:direct-debit/create-mandate create-mandate
@@ -68,6 +69,8 @@
   component/Lifecycle
   (start [this]
     (let [bus (b/event-bus)
+          ;; Dummy DB to record created mandates
+          mandate-db (atom {})
           process-fn
           (fn [^ProcessRecordsInput input]
             (let [records (.getRecords input)]
@@ -81,15 +84,24 @@
           worker (worker input-stream process-fn this)]
       (doseq [[message-type handler] message-handlers]
         (log/debug "Subscribing handler for" message-type)
-        (s/consume
-         (fn [{client-id :client/id :as message}]
-           (kinesis/put (:client kinesis-client) output-stream (str client-id)
-                        (-> message handler util/clj->msgpack)))
-         (b/subscribe bus message-type)))
+        (let [handler-with-db (partial handler mandate-db)]
+          (s/consume
+          (fn [{client-id :client/id :as message}]
+            (log/tracef "Consuming %s with %s" message handler)
+            (try
+              (->> (handler-with-db message)
+                   (util/clj->msgpack)
+                   (kinesis/put (:client kinesis-client) output-stream (str client-id)))
+              (catch Exception e
+                (log/errorf e "Exception processing %s message" message-type))))
+          (b/subscribe bus message-type))))
       (start! worker)
-      (assoc this :worker worker)))
+      (assoc this
+             :bus bus
+             :worker worker
+             :mandate-db mandate-db)))
 
   (stop [{:keys [worker] :as this}]
     (when worker
       (stop! worker))
-    (assoc this :worker nil)))
+    (assoc this :worker nil :mandate-db nil)))

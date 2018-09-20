@@ -13,6 +13,7 @@
 
             [aleph.http :as http]
             [manifold.stream :as s]
+            [manifold.bus :as b]
             [sabe.util :as util])
   (:import [ch.qos.logback.classic Logger]
            [org.slf4j LoggerFactory]))
@@ -83,62 +84,100 @@
    :message/data {:sent-time (System/currentTimeMillis)}
    :client/id client-id})
 
-(defn create-mandate-msg [client-id]
+(defn create-msg [client-id type data]
+  ;; TODO: Authorisation and signature
   {:message/id (java.util.UUID/randomUUID)
-   :message/type :direct-debit/create-mandate
-   :message/data {:email "joe@bloggs.com"
-                  :first-name "joe"
-                  :last-name "bloggs"
-                  :address {:line1 "123 street"
-                            :line2 ""
-                            :city "London"
-                            :postcode "AB12 3CD"
-                            :country-code :gb}
-                  :sort-code "01-23-45"
-                  :account-number "12345678"
-                  :amount "£9.99"
-                  :schedule {:on 5 :each :month}}
+   :message/type type
+   :message/data data
    :client/id client-id})
 
-(comment
-  ;; Silence noise from KCL
-  (set-logging-level! 'com.amazonaws.services.kinesis.clientlibrary :error)
-
-  (let [ws-base-url "ws://localhost:8080/message/"
-        client-id (java.util.UUID/randomUUID)
-        conn @(http/websocket-client (str ws-base-url client-id))
-        msg (ping-msg client-id)]
-
-    (let [r (time (do
-                    @(s/put! conn (util/clj->msgpack msg))
-                    @(s/try-take! conn ::drained 10000 ::timeout)))]
-      (println (if (bytes? r)
-                 (util/msgpack->clj r)
-                 r)))
-    (s/close! conn)))
-
-(comment
-  (def ws-base-url "ws://localhost:8080/message/")
-  (def client-id (java.util.UUID/randomUUID))
-  (def conn @(http/websocket-client (str ws-base-url client-id)))
-  (def msg (ping-msg client-id))
-
+(defn send-and-wait [conn msg]
   @(s/put! conn (util/clj->msgpack msg))
-  (def reply @(s/take! conn))
-  (println (util/msgpack->clj reply))
+  (let [reply @(s/try-take! conn ::drained 10000 ::timeout)]
+    (if (bytes? reply)
+      (util/msgpack->clj reply)
+      reply)))
 
-  (s/close! conn)
+(comment
+  ;; Silence noise from Kinesis/KCL
+  (set-logging-level! 'com.amazonaws.services.kinesis :error)
   )
 
 (comment
-  (def ws-base-url "ws://localhost:8080/echo")
-  (def client-id (java.util.UUID/randomUUID))
-  (def conn @(http/websocket-client ws-base-url))
-  (def msg (ping-msg client-id))
+  ;; Test the WebServer socket
+  (let [conn @(http/websocket-client "ws://localhost:8080/echo")
+        msg (ping-msg (java.util.UUID/randomUUID))]
 
-  @(s/put! conn (util/clj->msgpack msg))
-  (def reply @(s/take! conn))
-  (println (util/msgpack->clj reply))
+    @(s/put! conn (util/clj->msgpack msg))
+    (println (util/msgpack->clj @(s/take! conn)))
+    (s/close! conn))
+  )
+
+(comment
+  ;; Ping!
+  (let [ws-base-url "ws://localhost:8080/message/"
+        client-id (java.util.UUID/randomUUID)
+        conn @(http/websocket-client (str ws-base-url client-id))]
+    (set-logging-level! 'sabe :error)
+    (dotimes [_ 4]
+      (let [msg (ping-msg client-id)
+            reply (send-and-wait conn msg)
+            now (System/currentTimeMillis)]
+        (if (map? reply)
+          (let [{:keys [sent-time received-time]} (:message/data reply)]
+            (log/infof "outward=%dms return=%dms total=%dms"
+                       (- received-time sent-time)
+                       (- now received-time)
+                       (- now sent-time)))
+          (log/info "Failed:" reply))))
+
+    (s/close! conn))
+  )
+
+(comment
+
+  ;; Setup a direct debit ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  (set-logging-level! 'sabe :trace)
+  (def client-id (java.util.UUID/randomUUID))
+  (def conn @(http/websocket-client (str "ws://localhost:8080/message/" client-id)))
+  (def data {:email "joe@bloggs.com"
+             :first-name "joe"
+             :last-name "bloggs"
+             :address {:line1 "123 street"
+                       :line2 ""
+                       :city "London"
+                       :postcode "AB12 3CD"
+                       :country-code :gb}
+             :sort-code "01-23-45"
+             :account-number "12345678"
+             :amount "£9.99"
+             :schedule {:on 5 :each :month}})
+
+  (def msg (create-msg client-id :direct-debit/create-mandate data))
+  (def reply (send-and-wait conn msg))
+
+  (if (map? reply)
+    (log/info "Success:" reply)
+    (log/info "Failed:" reply))
+
+  (log/info (-> system :direct-debit-app :mandate-db deref ))
+
+
+  ;; Cancel a direct debit ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  (def mandate (:message/data reply))
+  (def msg (create-msg client-id :direct-debit/cancel-mandate
+                       {:mandate/id (:mandate/id mandate)
+                        :country-code (-> mandate :mandate/details
+                                          :address :country-code)}))
+  (println msg)
+  (def reply (send-and-wait conn msg))
+  (if (map? reply)
+    (log/info "Success:" reply)
+    (log/info "Failed:" reply))
+
+  (log/info (-> system :direct-debit-app :mandate-db deref keys))
 
   (s/close! conn)
   )
