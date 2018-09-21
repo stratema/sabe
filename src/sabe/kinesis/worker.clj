@@ -16,11 +16,11 @@
 (defn- config
   [stream
    {:keys [credentials-profile worker-id name region version failover-time]
-    :or {credentials-profile "sabe"
-         region "eu-west-1"
-         version "0.1.0"
-         failover-time 30000}
-    :as opts}]
+    :or   {credentials-profile "sabe"
+           region              "eu-west-1"
+           version             "0.1.0"
+           failover-time       30000}
+    :as   opts}]
   (doto (KinesisClientLibConfiguration.
          name stream
          (ProfileCredentialsProvider. (or credentials-profile name))
@@ -36,8 +36,8 @@
           (createProcessor [_]
             (reify IRecordProcessor
               (initialize [_ input]
-                (logging/mdc-put {:app name
-                                  :stream stream
+                (logging/mdc-put {:app      name
+                                  :stream   stream
                                   :shard-id (.getShardId input)})
                 (when (fn? init-fn) (init-fn input))
                 (log/info "Started"))

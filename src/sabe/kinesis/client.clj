@@ -20,12 +20,12 @@
 (defn create
   [{:keys [credentials-profile name region version] :as opts}]
   (try
-    (let [config (util/client-configuration name version)
+    (let [config   (util/client-configuration name version)
           provider (ProfileCredentialsProvider. credentials-profile)
-          builder (doto (AmazonKinesisClientBuilder/standard)
-                    (.setRegion region)
-                    (.setClientConfiguration config)
-                    (.setCredentials provider))]
+          builder  (doto (AmazonKinesisClientBuilder/standard)
+                     (.setRegion region)
+                     (.setClientConfiguration config)
+                     (.setCredentials provider))]
       (.build builder))))
 
 (defn active?

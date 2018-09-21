@@ -12,17 +12,17 @@
 
 (defn prod-system []
   {:components
-   {:kinesis-client (kinesis/map->KinesisClient {})
+   {:kinesis-client       (kinesis/map->KinesisClient {})
     ;; :input-logging-app (apps/map->LoggingApp {})
     ;; :output-logging-app (apps/map->LoggingApp {})
-    :direct-debit-app (apps-direct-debit/map->DirectDebitApp {})
-    :system-app (apps-system/map->SystemApp {})
-    :webserver (webserver/map->WebServer {})
+    :direct-debit-app     (apps-direct-debit/map->DirectDebitApp {})
+    :system-app           (apps-system/map->SystemApp {})
+    :webserver            (webserver/map->WebServer {})
     :webserver-output-app (apps-webserver-output/map->WebServerOutputApp {})}
    :dependencies
    {:direct-debit-app [:kinesis-client]
-    :system-app [:kinesis-client]
-    :webserver [:kinesis-client :webserver-output-app]}})
+    :system-app       [:kinesis-client]
+    :webserver        [:kinesis-client :webserver-output-app]}})
 
 (defn new-system
   [{:keys [components dependencies]} config]

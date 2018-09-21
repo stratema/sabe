@@ -10,9 +10,9 @@
 
 (defmethod aero/reader 'region
   [{:keys [region]} _ value]
-  (cond (contains? value region) (get value region)
+  (cond (contains? value region)   (get value region)
         (contains? value :default) (get value :default)
-        :otherwise nil))
+        :otherwise                 nil))
 
 (defmethod aero/reader 'regex
   [_ _ value]
@@ -30,8 +30,8 @@
 
 (defn output-settings
   [config]
-  (let [out (StringWriter.)
-        kvs (->> config util/flatten-keys (sort-by key))
+  (let [out    (StringWriter.)
+        kvs    (->> config util/flatten-keys (sort-by key))
         kwidth (some->> (keys kvs) (map (comp count str)) (reduce max))]
     (doseq [[k v] kvs]
       (pprint/cl-format out (str "~" kwidth "A ~A\n") k v))
@@ -40,19 +40,19 @@
 (defn config
   [{:keys [config-key config-file profile region
            master-config-file restore-last-backup]
-    :or {profile :dev region :nam
-         config-key (System/getenv "CONFIG_KEY")
-         master-config-file "config.edn"
-         restore-last-backup false}}]
+    :or   {profile             :dev region :nam
+           config-key          (System/getenv "CONFIG_KEY")
+           master-config-file  "config.edn"
+           restore-last-backup false}}]
   (when (nil? config-key)
     (log/warn "Config key is nil, can't decrypt secrets"))
 
   (some->> profile name string/upper-case (System/setProperty "PROFILE"))
   (some->> region name string/upper-case (System/setProperty "REGION"))
 
-  (let [options {:config-key config-key :decrypt true
-                 :profile profile :region region}
-        config (-> master-config-file io/resource (aero/read-config options))
+  (let [options  {:config-key config-key :decrypt true
+                  :profile    profile    :region  region}
+        config   (-> master-config-file io/resource (aero/read-config options))
         override (some-> config-file io/file (aero/read-config options))]
     (log/infof "Configuration:\n%s"
                (-> master-config-file

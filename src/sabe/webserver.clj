@@ -12,9 +12,9 @@
    [sabe.kinesis.client :as kinesis]))
 
 (def non-websocket-request
-  {:status 400
+  {:status  400
    :headers {"content-type" "application/text"}
-   :body "Expected a websocket request."})
+   :body    "Expected a websocket request."})
 
 (defn echo-handler
   [req]
@@ -28,7 +28,7 @@
 (defn msg-handler
   [req
    {:keys [kinesis-client input-stream bus client-write-timeout]}]
-  (let [client-id (-> req :params :client-id)
+  (let [client-id        (-> req :params :client-id)
         bus-subscription (b/subscribe bus client-id)]
     (log/tracef "Subscribed to bus with client-id '%s'" client-id)
     (->
@@ -47,7 +47,7 @@
 
        ;; msg-output -> websocket
        (s/connect bus-subscription socket
-                  {:timeout client-write-timeout
+                  {:timeout   client-write-timeout
                    :upstream? true}))
      (d/catch
          (fn [_] non-websocket-request))))
@@ -72,10 +72,10 @@
     (log/info "Starting WebServer")
     (assoc this :server
            (http/start-server
-            (server-handler {:kinesis-client (:client kinesis-client)
-                             :input-stream input-stream
+            (server-handler {:bus                  (:bus webserver-output-app)
                              :client-write-timeout client-write-timeout
-                             :bus (:bus webserver-output-app)})
+                             :input-stream         input-stream
+                             :kinesis-client       (:client kinesis-client)})
             {:port port})))
 
   (stop [{:keys [server] :as this}]

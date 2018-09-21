@@ -17,7 +17,7 @@
 (defn get-iv-bytes
   "Initialisesand returns a random iv vector byte[]"
   []
-  (let [sr (SecureRandom/getInstance "SHA1PRNG")
+  (let [sr       (SecureRandom/getInstance "SHA1PRNG")
         iv-bytes (byte-array 16)]
     (.nextBytes sr iv-bytes)
     iv-bytes))
@@ -26,7 +26,7 @@
   "Returns a AES SecretKey encoded as a byte[]"
   [seed]
   (let [keygen (KeyGenerator/getInstance "AES")
-        sr (SecureRandom/getInstance "SHA1PRNG")]
+        sr     (SecureRandom/getInstance "SHA1PRNG")]
     (.setSeed sr (utf8-bytes seed))
     (.init keygen 128 sr)
     (.. keygen generateKey getEncoded)))
@@ -37,7 +37,7 @@
   ^Cipher
   [mode seed iv-bytes]
   (let [key-spec (SecretKeySpec. (get-raw-key seed) "AES")
-        iv-spec (IvParameterSpec. iv-bytes)]
+        iv-spec  (IvParameterSpec. iv-bytes)]
     (doto (Cipher/getInstance "AES/CBC/PKCS5Padding")
       (.init (int mode) key-spec iv-spec))))
 
@@ -46,8 +46,8 @@
   decrypted later with `decrypt`"
   [value key]
   (let [value-bytes (if (string? value) (utf8-bytes value) value)
-        iv-bytes (get-iv-bytes)
-        cipher (get-cipher Cipher/ENCRYPT_MODE key iv-bytes)]
+        iv-bytes    (get-iv-bytes)
+        cipher      (get-cipher Cipher/ENCRYPT_MODE key iv-bytes)]
     (into-array Byte/TYPE (concat iv-bytes
                                   (.doFinal cipher value-bytes)))))
 
@@ -57,9 +57,9 @@
   to use when decrypting. The remainder is the encrypted data."
   [value key]
   (let [[iv-bytes encrypted-data] (split-at 16 value)
-        iv-bytes       (into-array Byte/TYPE iv-bytes)
-        encrypted-data (into-array Byte/TYPE encrypted-data)
-        cipher (get-cipher Cipher/DECRYPT_MODE key iv-bytes)]
+        iv-bytes                  (into-array Byte/TYPE iv-bytes)
+        encrypted-data            (into-array Byte/TYPE encrypted-data)
+        cipher                    (get-cipher Cipher/DECRYPT_MODE key iv-bytes)]
     (.doFinal cipher encrypted-data)))
 
 (defn encrypt-as-base64

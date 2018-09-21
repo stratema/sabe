@@ -78,6 +78,8 @@
 
 ;; Demo ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(def pp pprint/pprint)
+
 (defn ping-msg [client-id]
   {:message/id (java.util.UUID/randomUUID)
    :message/type :system/echo-request
@@ -104,7 +106,9 @@
   )
 
 (comment
-  ;; Test the WebServer socket
+
+  ;; Test the WebServer socket ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
   (let [conn @(http/websocket-client "ws://localhost:8080/echo")
         msg (ping-msg (java.util.UUID/randomUUID))]
 
@@ -114,7 +118,9 @@
   )
 
 (comment
-  ;; Ping!
+
+  ;; Ping! ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
   (let [ws-base-url "ws://localhost:8080/message/"
         client-id (java.util.UUID/randomUUID)
         conn @(http/websocket-client (str ws-base-url client-id))]
@@ -155,29 +161,34 @@
              :schedule {:on 5 :each :month}})
 
   (def msg (create-msg client-id :direct-debit/create-mandate data))
+
+  (pp msg)
+
   (def reply (send-and-wait conn msg))
 
   (if (map? reply)
     (log/info "Success:" reply)
     (log/info "Failed:" reply))
 
-  (log/info (-> system :direct-debit-app :mandate-db deref ))
+  (pp reply)
 
+  (pp (-> system :direct-debit-app :mandate-db deref))
+
+  (def mandate (:message/data reply))
 
   ;; Cancel a direct debit ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-  (def mandate (:message/data reply))
   (def msg (create-msg client-id :direct-debit/cancel-mandate
                        {:mandate/id (:mandate/id mandate)
                         :country-code (-> mandate :mandate/details
                                           :address :country-code)}))
-  (println msg)
+  (pp msg)
   (def reply (send-and-wait conn msg))
   (if (map? reply)
     (log/info "Success:" reply)
     (log/info "Failed:" reply))
 
-  (log/info (-> system :direct-debit-app :mandate-db deref keys))
+  (pp (-> system :direct-debit-app :mandate-db deref keys))
 
   (s/close! conn)
   )
